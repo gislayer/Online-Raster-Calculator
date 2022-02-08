@@ -1,14 +1,20 @@
 <template>
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+  <LeftSide/>
+  <Bands/>
+  <Map/>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import LeftSide from './components/LeftSide.vue'
+import Bands from './components/Bands.vue'
+import Map from './components/Map.vue'
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    LeftSide,
+    Bands,
+    Map,
   }
 }
 </script>

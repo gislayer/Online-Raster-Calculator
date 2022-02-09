@@ -17,11 +17,12 @@ export default {
   data(){
     return {
       title:'Online Raster Calculator',
-      basemaptype:'dark',
+      basemaptype:'satellite',
       map:false
     }
   },
   mounted(){
+     console.log("Harita Yükleniyor");
       this.initMap();
   },
   methods: {
@@ -29,6 +30,7 @@ export default {
         this.map = GL.initMap();
     },
     openBasemap:function(type){
+        GL.mesaj="openBasemap"
         this.basemaptype=type;
         GL.changeBasemap(type);
     }

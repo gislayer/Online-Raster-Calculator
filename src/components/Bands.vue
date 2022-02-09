@@ -1,14 +1,15 @@
 <template>
   <div class="ui inverted segment bands">
-    <div class="horBands">Band List</div>
-    <div :key="i" v-for="(item,i) in bands" class="hor" :style="{backgroundColor:item.color,color:item.fontColor}" :data-tooltip="item.title" data-inverted="" data-position="bottom center">
+    <div v-show="bandType.selected!==''" class="horBands">Band List</div>
+    <div v-show="bandType.selected!==''" @click="openBand(item)" :key="i" v-for="(item,i) in bands" class="hor" :style="{backgroundColor:item.color,color:item.fontColor}" :data-tooltip="item.title" data-inverted="" data-position="bottom center">
       <div class="mt10 fontBold noSelect">{{item.name}}</div>
     </div>
-    <div class="field inv">
+    <div v-show="bandType.selected!==''" class="field inv">
       <select @change="setBands" style="background-color:#646464; color:#fff;" v-model="bandType.selected" class="ui inverted fluid dropdown">
         <option :key="j" v-for="(list,j) in bandType.data" :value="list.id">{{list.name}}</option>
       </select>
     </div>
+    <div></div>
   </div>
 </template>
 
@@ -23,7 +24,7 @@ export default {
   data(){
     return {
       bandType:{
-          selected:'sentinel2',
+          selected:'',
           data:[
               {
                   id:'sentinel2',name:'Source Type : Sentinel 2 MSI'
@@ -52,8 +53,8 @@ export default {
     setBands(){
       this.bands=[];
       if(this.bandType.selected!==''){
-        this.$store.commit('changeSatellite',this.bandType.selected);
-        this.$emit('changeSatellite',this.bandType.selected);
+        //this.$root.$.components.LeftSide.methods.changeList(this.bandType.selected)
+        this.$root.$refs.leftside.changeList(this.bandType.selected)
         var mybands = GL.satellites[this.bandType.selected];
         for(var i in mybands){
           this.bands.push({
@@ -67,6 +68,10 @@ export default {
     },
     getBands(){
       return this.bands;
+    },
+    openBand:function(band){
+      var file = this.$root.$refs.leftside.getActiveFile();
+      GL.changeBandLayer(file,band.name);
     }
   },
 }
@@ -84,6 +89,7 @@ export default {
   top: 0 !important;
   margin: 0 !important;
   z-index:1 !important;
+  min-height: 74px;
 }
 .horBands{
   display:inline-block;
@@ -92,6 +98,7 @@ export default {
   border-radius:100%;
   margin-left:10px;
   margin-right:10px;
+  margin-top:12px;
   opacity:1;
   cursor:pointer;
 }
@@ -101,10 +108,10 @@ export default {
   height:46px;
   text-align:center;
   border-radius:100%;
-  border:2px solid #000000;
+  border:2px solid #fff;
   margin-left:10px;
   margin-right:10px;
-  opacity:0.6;
+  opacity:0.7;
   cursor:pointer;
 }
 .hor:hover{

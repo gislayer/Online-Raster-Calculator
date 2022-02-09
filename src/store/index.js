@@ -8,10 +8,9 @@ const store = createStore({
   },
   mutations: {
     changeSatellite (state,payload) {
-      console.log("changeSatellite Çalıştı : "+payload);
       state.satelliteType=payload;
     }
   }
 })
 
-export default store
+export default store;

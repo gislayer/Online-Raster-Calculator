@@ -1,13 +1,15 @@
 <template>
-  <LeftSide/>
-  <Bands/>
-  <Map/>
+  <LeftSide ref="leftside"/>
+  <Bands ref="bands"/>
+  <Map ref="map"/>
+  <BandSourceType ref="bandsourcetype"/>
 </template>
 
 <script>
 import LeftSide from './components/LeftSide.vue'
 import Bands from './components/Bands.vue'
 import Map from './components/Map.vue'
+import BandSourceType from './components/BandSourceType.vue'
 
 export default {
   name: 'App',
@@ -15,6 +17,7 @@ export default {
     LeftSide,
     Bands,
     Map,
+    BandSourceType,
   }
 }
 </script>

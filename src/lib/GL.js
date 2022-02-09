@@ -1,12 +1,18 @@
 //import GeoTIFF, { fromUrl, fromUrls, fromArrayBuffer, fromBlob } from 'geotiff';
+import {fromArrayBuffer} from 'geotiff';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
 import XYZ from 'ol/source/XYZ';
+import Static from 'ol/source/ImageStatic';
+import ImageLayer from 'ol/layer/Image';
+import proj4 from 'proj4';
+import {register} from 'ol/proj/proj4';
 import {FullScreen, defaults as defaultControls, Zoom, ScaleLine} from 'ol/control';
-
+import {transformExtent} from 'ol/proj';
 
 var GL = {
+    rasters:{},
     map:false,
     basemap:false,
     controls:{
@@ -14,7 +20,7 @@ var GL = {
         fullscreen:false,
         scale:false
     },
-    
+    mesaj:'başlangıç'
     
 };
 
@@ -24,7 +30,7 @@ GL.initMap = function(){
     this.controls.scale = new ScaleLine();
     this.basemap = new TileLayer({
         source: new XYZ({
-            url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            url: 'https://mts{0-3}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
             })
         })
     this.map = new Map({
@@ -125,7 +131,7 @@ GL.satellites = {
     }
 }
 
-GL.UAanalysis = {
+GL.RSanalysis = {
     ndvi:{
         id:'ndvi',
         type:1,
@@ -185,8 +191,220 @@ GL.UAanalysis = {
 };
 
 
-GL.loadGeoTIFF = function(){
+GL.loadGeoTIFFFromComputer = function(bandType,callback){
+    var fileElement = document.createElement('input');
+    fileElement.type = 'file';
+    fileElement.accept = '.tiff,.tif,.geotiff';
+    fileElement.click();
+    fileElement.addEventListener('change',function(e){
+      console.log("geldi");
+      var file = e.target.files[0];
+      var reader  = new FileReader();
+      var ext = file.name.split('.').pop();
+      var allowedExt = ['tiff','tif','geotiff'];
+      if(allowedExt.indexOf(ext) == -1){
+          alert('File format not supported. Supported formats: tif, tiff, geotiff');
+          return false;
+      }else{
+        reader.addEventListener("load", function () {
+          GL.readGeoTIFF(reader.result,(result)=>{
+            callback({
+              id:'file-'+Date.now(),
+              name:file.name,
+              ext:ext,
+              data:result,
+              bandType:bandType,
+              added:false
+            });
+          });
+            
+            //var img = new Image();
+        });
+        reader.readAsArrayBuffer(file);
+      }      
+    },false);
+}
+
+GL.EPSG = {
+  default: 'EPSG:3857',
+  current: 'EPSG:3857',
+  file: 'EPSG:4326',
+  result: {},
+  search: function search(text) {
+    var url = 'https://epsg.io/?format=json&q=' + text;
+    fetch(url).then(function (response) {
+      return response.json();
+    }).then(function (result) {
+      if (result.number_result > 0) {
+        var res = result.results[0];
+        var code = res['code'];
+        var proj4def = res['proj4'];
+        var newProjCode = 'EPSG:' + code;
+        proj4.defs(newProjCode, proj4def);
+        register(proj4);
+      } else {
+        alert("EPSG code not found");
+      }
+    });
+  },
+};
+
+GL.readGeoTIFF = function(data,callback){
+  console.log("fromArrayBuffer");
+  fromArrayBuffer(data).then(function(tiff) {
+    tiff.getImage().then(function(image) {
+      var bits = image.fileDirectory.BitsPerSample;
+      var epsgcode = image.geoKeys.ProjectedCSTypeGeoKey;
+      var width = image.getWidth();
+      var height = image.getHeight();
+      var bbox = image.getBoundingBox();
+      GL.EPSG.search(epsgcode);
+      image.readRasters().then(function(bands){
+        var result = {
+          bands:bands,
+          width:width,
+          height:height,
+          bbox:bbox,
+          epsg:epsgcode,
+          bits:bits
+        }
+        callback(result);
+      });
+    });
     
+  });
+}
+
+GL.createRasterImage=function(obj){
+  var width=obj.width;
+  var height=obj.height;
+  var bands=obj.bands;
+  var bit = obj.bit;
+  var k = 1;
+  switch(bit[0]){
+    case 8:{
+      k=1;
+      break;
+    }
+    case 16:{
+      k=128;
+      break;
+    }
+  }
+  let canvas = document.createElement('canvas');
+  canvas.width  = width;
+  canvas.height = height; 
+  canvas.style.width  = width+'px';
+  canvas.style.height = height+'px';
+
+  var ctx=canvas.getContext("2d");
+              
+  var imageData=ctx.createImageData(width,height);
+  var j=0;
+  for(var i=0;i<imageData.data.length;i+=4){
+    imageData.data[i+0] = bands[0][j]/k;
+    imageData.data[i+1] = bands[1][j]/k;
+    imageData.data[i+2] = bands[2][j]/k;
+    imageData.data[i+3] = 255;
+    j++
+  }
+
+  ctx.putImageData(imageData,0,0);
+  var base64img=canvas.toDataURL("image/png");
+
+  return base64img;
+}
+
+GL.addRasterLayer = function(file){
+  console.log("addRasterLayer");
+  var layerControl = this.rasters[file.id];
+  if(layerControl!==undefined){
+    GL.map.getView().fit(transformExtent(file.data.bbox, 'EPSG:'+file.data.epsg, 'EPSG:3857'), GL.map.getSize());
+    return false;
+  }
+  var bandType = file.bandType;
+  var sat = GL.satellites[bandType];
+  var red = sat.RED.id;
+  var green = sat.GREEN.id;
+  var blue = sat.BLUE.id;
+  var obj = {
+    width:file.data.width,
+    height:file.data.height,
+    bands:[file.data.bands[red],file.data.bands[green],file.data.bands[blue]],
+    bit:file.data.bits
+  };
+  var imageData = GL.createRasterImage(obj);
+  this.rasters[file.id] = new ImageLayer({
+    id:file.id,
+    name:file.name,
+    source:new Static({
+      url: imageData,
+      imageExtent: file.data.bbox,
+      projection: 'EPSG:'+file.data.epsg
+    })
+  });
+
+  this.map.addLayer(this.rasters[file.id]);
+  GL.map.getView().fit(transformExtent(file.data.bbox, 'EPSG:'+file.data.epsg, 'EPSG:3857'), GL.map.getSize());
+}
+
+GL.changeBandLayer = function(file,bandName){
+  console.log("changeBandLayer");
+  var layer = GL.rasters[file.id];
+  if(layer===undefined){
+    return false;
+  }
+  var sat = GL.satellites[file.bandType];
+  var bandnum=0;
+  for(var i in sat){
+    if(sat[i].band==bandName){
+      bandnum=sat[i].id;
+      break;
+    }
+  }
+  var source = layer.getSource();
+  if(layer.originalBase64==undefined){
+    layer.originalBase64 = source.getUrl();
+  }
+  var canvasA = document.createElement('canvas');
+  canvasA.width=file.data.width;
+  canvasA.height=file.data.height;
+  var ctxA = canvasA.getContext("2d");
+  var imageObj = new Image();
+  imageObj.onload = function() {
+    ctxA.drawImage(imageObj, 0, 0);
+    var imageData = ctxA.getImageData(0, 0, file.data.width, file.data.height);
+    var j=0;
+    var min=999999;
+    var max = 0;
+    for(var k=0;k<file.data.bands[bandnum].length;k++){
+      if(file.data.bands[bandnum][k]>max){
+        max=file.data.bands[bandnum][k];
+      }
+      if(file.data.bands[bandnum][k]<min){
+        min=file.data.bands[bandnum][k];
+      }
+    }
+    var abs = max-min;
+    for(var i=0;i<imageData.data.length;i+=4){
+      imageData.data[i+0] = ((255*(file.data.bands[bandnum][j]-min))/abs)+50;
+      imageData.data[i+1] = ((255*(file.data.bands[bandnum][j]-min))/abs)+50;
+      imageData.data[i+2] = ((255*(file.data.bands[bandnum][j]-min))/abs)+50;
+      imageData.data[i+3] = 255;
+      j++
+    }
+    ctxA.putImageData(imageData,0,0);
+    var base64img=canvasA.toDataURL("image/png");
+    var newsource = new Static({
+      url: base64img,
+      imageExtent: file.data.bbox,
+      projection: 'EPSG:'+file.data.epsg
+    });
+    layer.setSource(newsource);
+  }
+  imageObj.src = layer.originalBase64;
+  console.log(sat);
+  console.log(bandName);
 }
 
 

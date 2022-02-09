@@ -1,13 +1,16 @@
-# www
+# ONLINE RASTER CALCULATOR
+
+### Project Demo
+See [Demo Page](https://remotesensing.gislayer.com/).
 
 ## Project setup
 ```
 npm install
-```
+```s
 
 ### Compiles and hot-reloads for development
 ```
-npm run serve
+npm run dev
 ```
 
 ### Compiles and minifies for production
@@ -19,6 +22,3 @@ npm run build
 ```
 npm run lint
 ```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).

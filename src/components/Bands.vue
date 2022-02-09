@@ -165,7 +165,7 @@ export default {
   border:2px solid #000000;
   margin-left:10px;
   margin-right:10px;
-  opacity:0.8;
+  opacity:0.6;
   cursor:pointer;
 }
 .hor:hover{

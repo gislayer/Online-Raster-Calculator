@@ -5,9 +5,10 @@
     </div>
     <div class="item" style="color: #8bc34a;">{{title}}</div>
     <div class="item" style="text-align:left;">
-      <div class="header">Menu</div>
+      <div class="header">Add Raster Image</div>
       <div class="menu">
-        <a class="item" href="#">Import Raster Image</a>
+        <a class="item" href="#">Load From Computer</a>
+        <a class="item" href="#">Load From URL</a>
       </div>
     </div>
     <div class="item" style="text-align:left;">

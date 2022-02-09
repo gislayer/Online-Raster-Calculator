@@ -5,7 +5,7 @@
       <div class="mt10 fontBold noSelect">{{item.name}}</div>
     </div>
     <div class="field inv">
-      <select style="background-color:#646464; color:#fff;" v-model="bandType.selected" class="ui inverted fluid dropdown">
+      <select @change="setBands" style="background-color:#646464; color:#fff;" v-model="bandType.selected" class="ui inverted fluid dropdown">
         <option :key="j" v-for="(list,j) in bandType.data" :value="list.id">{{list.name}}</option>
       </select>
     </div>
@@ -13,6 +13,8 @@
 </template>
 
 <script>
+import GL from '../lib/GL.js'
+
 export default {
   name: 'Bands',
   mounted() {
@@ -24,93 +26,22 @@ export default {
           selected:'sentinel2',
           data:[
               {
-                  id:'sentinel2',name:'Source Type : Sentinel-2'
+                  id:'sentinel2',name:'Source Type : Sentinel 2 MSI'
               },
               {
-                  id:'landsat8',name:'Source Type : Landsat 8'
+                  id:'landsat5',name:'Source Type : Landsat 5 TM'
+              },
+              {
+                  id:'landsat8',name:'Source Type : Landsat 8 OLI'
+              },
+              {
+                  id:'ibgr',name:'Source Type : IBGR'
+              },
+              {
+                  id:'rgbi',name:'Source Type : RGBI'
               },
               {
                   id:'custom',name:'Source Type : Custom'
-              }
-          ],
-          sentinel2:[
-              {
-                  name:'B01',
-                  title:'Coastal Aerosol',
-                  color:'#673AB7',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B02',
-                  title:'Blue',
-                  color:'#2196F3',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B03',
-                  title:'Green',
-                  color:'#4CAF50',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B04',
-                  title:'Red',
-                  color:'#F44336',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B05',
-                  title:'Vegetation Red Edge - 704.1nm',
-                  color:'#E91E63',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B06',
-                  title:'Vegetation Red Edge - 740.5nm',
-                  color:'#9C27B0',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B07',
-                  title:'Vegetation Red Edge - 782.8nm',
-                  color:'#3F51B5',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B08',
-                  title:'NIR',
-                  color:'#B20000',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B8A',
-                  title:'Narrow NIR',
-                  color:'#008C69',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B09',
-                  title:'Water Vapour',
-                  color:'#888888',
-                  fontColor:'#EEEEEE'
-              },
-              {
-                  name:'B10',
-                  title:'SWIR – Cirrus',
-                  color:'#8BC34A',
-                  fontColor:'#2E3133'
-              },
-              {
-                  name:'B11',
-                  title:'SWIR - 1613.7nm',
-                  color:'#FFEB3B',
-                  fontColor:'#2E3133'
-              },
-              {
-                  name:'B12',
-                  title:'SWIR - 2202.4nm',
-                  color:'#FFC107',
-                  fontColor:'#2E3133'
               }
           ]
       },
@@ -121,9 +52,17 @@ export default {
     setBands(){
       this.bands=[];
       if(this.bandType.selected!==''){
-        this.bandType[this.bandType.selected].map(item=>{
-          this.bands.push(item);
-        });
+        this.$store.commit('changeSatellite',this.bandType.selected);
+        this.$emit('changeSatellite',this.bandType.selected);
+        var mybands = GL.satellites[this.bandType.selected];
+        for(var i in mybands){
+          this.bands.push({
+            color:mybands[i].color,
+            fontColor:mybands[i].fontColor,
+            title:mybands[i].name,
+            name:mybands[i]['band']
+          });
+        }
       }
     },
     getBands(){
@@ -190,7 +129,7 @@ export default {
             user-select: none; 
 }
 .inv{
-    width: 200px;
+    width: 220px;
     position: fixed;
     top: 18px;
     right: 0;

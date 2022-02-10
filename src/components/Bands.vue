@@ -5,6 +5,9 @@
       <div class="mt10 fontBold noSelect">{{item.name}}</div>
     </div>
     <div v-show="bandType.selected!==''" class="field inv">
+      <select @change="changePlotty" style="background-color:#646464; color:#fff;" v-model="plotty.selected" class="ui inverted fluid dropdown">
+        <option :key="j" v-for="(list,j) in plotty.data" :value="list">{{list.toUpperCase()}} Color Scale</option>
+      </select>
       <select @change="setBands" style="background-color:#646464; color:#fff;" v-model="bandType.selected" class="ui inverted fluid dropdown">
         <option :key="j" v-for="(list,j) in bandType.data" :value="list.id">{{list.name}}</option>
       </select>
@@ -23,6 +26,11 @@ export default {
   },
   data(){
     return {
+      clickedBand:'',
+      plotty:{
+        selected:'rainbow',
+        data:['viridis','inferno','turbo','rainbow','jet','hsv','hot','cool','spring','summer','autumn','winter','bone','copper','greys','ylgnbu','greens','ylorrd','bluered','rdbu','picnic','portland','blackbody','earth','electric','magma','plasma']
+      },
       bandType:{
           selected:'',
           data:[
@@ -69,9 +77,20 @@ export default {
     getBands(){
       return this.bands;
     },
-    openBand:function(band){
+    openBand(band){
       var file = this.$root.$refs.leftside.getActiveFile();
-      GL.changeBandLayer(file,band.name);
+      if(file){
+        this.clickedBand = band.name;
+        GL.changeBandLayer(file,band.name,this.plotty.selected);
+      }
+      
+    },
+    changePlotty(){
+      console.log("changePlotty");
+      if(this.clickedBand==''){
+        this.clickedBand="B01";
+      }
+      this.openBand({name:this.clickedBand});
     }
   },
 }
@@ -138,9 +157,9 @@ export default {
 .inv{
     width: 220px;
     position: fixed;
-    top: 18px;
+    top: -2px;
     right: 0;
-    margin-right: 20px;
     background-color: #2f3133;
 }
 </style>
+

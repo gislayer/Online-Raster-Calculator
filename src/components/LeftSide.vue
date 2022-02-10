@@ -45,10 +45,15 @@
                   </div>
                 </div>
                 <div class="extra content">
+                  <div>
+                    <div class="ui p3">
+                      <input @input="changeOpacity(item)" style="width:100%;" type="range" min="0" max="1" step="0.01" v-model="item.opacity">
+                    </div>
+                  </div>
                   <div class="mini ui buttons wp">
-                    <button class="ui red button">Clear</button>
+                    <button @click="clearAnalysis" class="ui red button">Clear</button>
                     <div class="or"></div>
-                    <button class="ui positive button">Run</button>
+                    <button @click="doAnalys(item)" class="ui positive button">Run</button>
                   </div>
                 </div>
               </div>
@@ -120,6 +125,23 @@ export default {
       return this.files.find((file)=>{
         return file.id==this.activeLayer;
       });
+    },
+    doAnalys(item){
+      console.log(item);
+      var plottyName = this.$root.$refs.bands.plotty.selected;
+      switch(item.type){
+        case 1:{
+          GL.doAnalysis1(item,this.getActiveFile(),plottyName);
+          GL.changeOpacity(this.getActiveFile(),item.opacity);
+          break;
+        }
+      }
+    },
+    clearAnalysis(){
+      GL.showRGBRaster(this.getActiveFile());
+    },
+    changeOpacity(item){
+      GL.changeOpacity(this.getActiveFile(),item.opacity);
     }
   },
 }
@@ -165,5 +187,10 @@ export default {
 }
 .bintrsh:hover{
   color: #8bc34a;
+}
+.p3{
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-top: 10px;
 }
 </style>

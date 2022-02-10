@@ -10,6 +10,8 @@ import proj4 from 'proj4';
 import {register} from 'ol/proj/proj4';
 import {FullScreen, defaults as defaultControls, Zoom, ScaleLine} from 'ol/control';
 import {transformExtent} from 'ol/proj';
+import {plot,addColorScale} from 'plotty';
+addColorScale("mycolorscale", ["#FF0000", "#00FF00", "#0000FF"], [0, 0.5, 1]);
 
 var GL = {
     rasters:{},
@@ -138,7 +140,8 @@ GL.RSanalysis = {
         name:'NDVI Analysis',
         method:['(','NIR','-','RED',')','/','(','NIR','+','RED',')'],
         vars:['NIR1','RED'],
-        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2']
+        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2'],
+        opacity:1
     },
     ndwi:{
         id:'ndwi',
@@ -146,7 +149,8 @@ GL.RSanalysis = {
         name:'NDWI Analysis',
         method:['(','GREEN','-','NIR',')','/','(','GREEN','+','NIR',')'],
         vars:['GREEN','NIR1'],
-        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2']
+        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2'],
+        opacity:1
     },
     nbr:{
         id:'nbr',
@@ -154,7 +158,8 @@ GL.RSanalysis = {
         name:'NBR Analysis',
         method:['(','NIR','-','SWIR-2',')','/','(','NIR','+','SWIR-2',')'],
         vars:['NIR1','SWIR2'],
-        accepted:['landsat5','landsat8','sentinel2']
+        accepted:['landsat5','landsat8','sentinel2'],
+        opacity:1
     },
     npcri:{
         id:'npcri',
@@ -162,7 +167,8 @@ GL.RSanalysis = {
         name:'NPCRI Analysis',
         method:['(','RED','-','BLUE',')','/','(','RED','+','BLUE',')'],
         vars:['RED','BLUE'],
-        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2']
+        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2'],
+        opacity:1
     },
     ndsi:{
         id:'ndsi',
@@ -170,7 +176,8 @@ GL.RSanalysis = {
         name:'NDSI Analysis',
         method:['(','GREEN','-','SWIR-1',')','/','(','GREEN','+','SWIR-1',')'],
         vars:['GREEN','SWIR1'],
-        accepted:['landsat5','landsat8','sentinel2']
+        accepted:['landsat5','landsat8','sentinel2'],
+        opacity:1
     },
     ndgi:{
         id:'ndgi',
@@ -178,7 +185,8 @@ GL.RSanalysis = {
         name:'NDGI Analysis',
         method:['(','NIR','-','GREEN',')','/','(','NIR','+','GREEN',')'],
         vars:['NIR1','GREEN'],
-        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2']
+        accepted:['rgbi','ibgr','landsat5','landsat8','sentinel2'],
+        opacity:1
     },
     ndmi:{
         id:'ndmi',
@@ -186,7 +194,8 @@ GL.RSanalysis = {
         name:'NDMI Analysis',
         method:['(','NIR','-','SWIR-1',')','/','(','NIR','+','SWIR-1',')'],
         vars:['NIR1','SWIR1'],
-        accepted:['landsat5','landsat8','sentinel2']
+        accepted:['landsat5','landsat8','sentinel2'],
+        opacity:1
     },
 };
 
@@ -279,9 +288,9 @@ GL.createRasterImage=function(obj){
   var width=obj.width;
   var height=obj.height;
   var bands=obj.bands;
-  var bit = obj.bit;
+  var bits = obj.bits;
   var k = 1;
-  switch(bit[0]){
+  switch(bits[0]){
     case 8:{
       k=1;
       break;
@@ -331,7 +340,7 @@ GL.addRasterLayer = function(file){
     width:file.data.width,
     height:file.data.height,
     bands:[file.data.bands[red],file.data.bands[green],file.data.bands[blue]],
-    bit:file.data.bits
+    bits:file.data.bits
   };
   var imageData = GL.createRasterImage(obj);
   this.rasters[file.id] = new ImageLayer({
@@ -348,7 +357,7 @@ GL.addRasterLayer = function(file){
   GL.map.getView().fit(transformExtent(file.data.bbox, 'EPSG:'+file.data.epsg, 'EPSG:3857'), GL.map.getSize());
 }
 
-GL.changeBandLayer = function(file,bandName){
+GL.changeBandLayer = function(file,bandName,plottyName){
   console.log("changeBandLayer");
   var layer = GL.rasters[file.id];
   if(layer===undefined){
@@ -369,44 +378,108 @@ GL.changeBandLayer = function(file,bandName){
   var canvasA = document.createElement('canvas');
   canvasA.width=file.data.width;
   canvasA.height=file.data.height;
-  var ctxA = canvasA.getContext("2d");
-  var imageObj = new Image();
-  imageObj.onload = function() {
-    ctxA.drawImage(imageObj, 0, 0);
-    var imageData = ctxA.getImageData(0, 0, file.data.width, file.data.height);
-    var j=0;
-    var min=999999;
-    var max = 0;
-    for(var k=0;k<file.data.bands[bandnum].length;k++){
-      if(file.data.bands[bandnum][k]>max){
-        max=file.data.bands[bandnum][k];
-      }
-      if(file.data.bands[bandnum][k]<min){
-        min=file.data.bands[bandnum][k];
-      }
+  var min=999999999;
+  var max = 0;
+  for(var k=0;k<file.data.bands[bandnum].length;k++){
+    if(file.data.bands[bandnum][k]>max){
+      max=file.data.bands[bandnum][k];
     }
-    var abs = max-min;
-    for(var i=0;i<imageData.data.length;i+=4){
-      imageData.data[i+0] = ((255*(file.data.bands[bandnum][j]-min))/abs)+50;
-      imageData.data[i+1] = ((255*(file.data.bands[bandnum][j]-min))/abs)+50;
-      imageData.data[i+2] = ((255*(file.data.bands[bandnum][j]-min))/abs)+50;
-      imageData.data[i+3] = 255;
-      j++
+    if(file.data.bands[bandnum][k]<min){
+      min=file.data.bands[bandnum][k];
     }
-    ctxA.putImageData(imageData,0,0);
-    var base64img=canvasA.toDataURL("image/png");
-    var newsource = new Static({
-      url: base64img,
-      imageExtent: file.data.bbox,
-      projection: 'EPSG:'+file.data.epsg
-    });
-    layer.setSource(newsource);
   }
-  imageObj.src = layer.originalBase64;
-  console.log(sat);
-  console.log(bandName);
+  var myplot = new plot({
+    canvas: canvasA,
+    data: file.data.bands[bandnum], 
+    width: file.data.width, 
+    height: file.data.height,
+    clampLow: true,
+    clampHigh: true,
+    domain: [min,max], colorScale: plottyName
+  });
+  myplot.render();
+  
+  var newsource = new Static({
+    url: canvasA.toDataURL("image/png"),
+    imageExtent: file.data.bbox,
+    projection: 'EPSG:'+file.data.epsg
+  });
+  layer.setSource(newsource);
 }
 
+GL.doAnalysis1 = function(analys,file,plottyName){
+  console.log("doAnalysis1");
+  var sat = GL.satellites[file.bandType];
+  var band1 = sat[analys.vars[0]].id;
+  var band2 = sat[analys.vars[1]].id;
+  var bands = file.data.bands;
+  var layer = GL.rasters[file.id];
+  if(layer===undefined){
+    return false;
+  }
+  var canvasA = document.createElement('canvas');
+  canvasA.width=file.data.width;
+  canvasA.height=file.data.height;
+  var min=9999999999;
+  var max = -9999999999;
+  var arr = [];
+  for(var i=0;i<bands[band1].length;i++){
+    var d = (bands[band1][i]-bands[band2][i])/(bands[band1][i]+bands[band2][i])*100;
+    //d=(d+1)/2;
+    if(d>max){max=d;}
+    if(d<min){min=d;}
+    arr.push(d);
+  }
+  var myplot = new plot({
+    canvas: canvasA,
+    data: arr, 
+    width: file.data.width, 
+    height: file.data.height,
+    clampLow: true,
+    clampHigh: true,
+    domain: [min,max], colorScale: plottyName
+  });
+  myplot.render();
+  
+  var newsource = new Static({
+    url: canvasA.toDataURL("image/png"),
+    imageExtent: file.data.bbox,
+    projection: 'EPSG:'+file.data.epsg
+  });
+  layer.setSource(newsource);
+  GL.changeOpacity(file,1);
+}
 
+GL.showRGBRaster = function(file){
+  var sat = GL.satellites[file.bandType];
+  var red = sat.RED.id;
+  var green = sat.GREEN.id;
+  var blue = sat.BLUE.id;
+  var obj = {
+    width:file.data.width,
+    height:file.data.height,
+    bands:[file.data.bands[red],file.data.bands[green],file.data.bands[blue]],
+    bits:file.data.bits
+  };
+  var imageData = GL.createRasterImage(obj);
+  var layer = GL.rasters[file.id];
+  if(layer===undefined){
+    return false;
+  }
+  var newsource = new Static({
+    url: imageData,
+    imageExtent: file.data.bbox,
+    projection: 'EPSG:'+file.data.epsg
+  });
+  layer.setSource(newsource);
+  GL.changeOpacity(file,1);
+}
+
+GL.changeOpacity = function(file,opacity){
+  var layer = GL.rasters[file.id];
+  if(layer!==undefined){
+    layer.setOpacity(parseFloat(opacity));
+  }
+}
 
 export default GL;

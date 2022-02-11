@@ -5,7 +5,7 @@ This feature has been taken from GISLayer's Web Based GIS Software and rearrange
 
 You can also submit your suggestions to us with the "Feedback" button on the website.  This software will now develop in an open source manner. Announced to software developers who want to join us
 
-![Online Raster Calculator and Remote Sensing Analiysis](https://drive.google.com/file/d/1Fx3z7Qfj1gD7ytqfrG__-sXb8cQagzSX/view?usp=sharing)
+![Online Raster Calculator and Remote Sensing Analiysis](https://static.wixstatic.com/media/638a67_54d044285653458dbbc1bbbc80b02d69~mv2.jpg)
 
 ## Data Loading Methods
 This feature only works for .tif and .geotiff files. We added to package.json The **[geotiff.js](https://www.npmjs.com/package/geotiff "geotiff.js")** library for used to read these files. Also Thank you to the creators of this library.
@@ -55,4 +55,3 @@ After uploading the tif file, the existing bands will be listed above. On the to
 ![Online Raster Calculator and Remote Sensing Analiysis](https://static.wixstatic.com/media/638a67_f61918606f164f0988faf68fca8fc368~mv2.jpg)
 
 ![Online Raster Calculator and Remote Sensing Analiysis](https://static.wixstatic.com/media/638a67_e3382dcfe3f74d659259b4b958e5bd5d~mv2.jpg)
-

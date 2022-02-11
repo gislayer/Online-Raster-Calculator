@@ -3,11 +3,19 @@
         <div :class="active==true?'ui mini test modal transition visible active':'ui mini test modal transition'">
                 <div class="header">What is Source of Satellite Image File?</div>
                 <div class="content">
-                    <div class="field">
-                        <select @change="setBands" v-model="bandType.selected" class="ui inverted fluid dropdown">
+                    <div class="ui form">
+                      <div class="field">
+                        <label>Select Data Source : </label>
+                        <select @change="setBands" v-model="bandType.selected" class="ui inverted fluid dropdown mt5">
                             <option :key="j" v-for="(list,j) in bandType.data" :value="list.id">{{list.name}}</option>
                         </select>
+                      </div>
+                      <div class="field mt20">
+                          <label>Source URL : </label>
+                          <input type="text" v-model="url" placeholder="Please Enter URL of Tif, GeoTiff File ">
+                      </div>
                     </div>
+                    
                 </div>
                 <div class="actions">
                     <div @click="close" class="ui mini cancel button">Cancel</div>
@@ -21,11 +29,12 @@
 <script>
 
 export default {
-  name: 'BandSourceType',
+  name: 'SoruceFromUrl',
   data(){
     return {
         active:false,
         callback:null,
+        url:'',
         bandType:{
           selected:'landsat8',
           data:[
@@ -61,14 +70,12 @@ export default {
         this.callback=callback;
     },
     typeSelected(){
-        console.log("typeSelected");
-        
         if(this.callback!==null){
-            if(this.bandType.selected!==''){
-                this.active=false;
-                this.callback(this.bandType.selected);
+          if(this.bandType.selected!=='' && this.url!==''){
+              this.active=false;
+                this.callback(this.bandType.selected,this.url);
             }else{
-                alert('Please select satellite image\'s band');
+                alert('Please select satellite image type and enter url');
             }
         }
     },
@@ -84,5 +91,11 @@ export default {
 .inv2{
     width: 220px;
     background-color: #2f3133;
+}
+.mt5{
+    margin-top: 5px;
+}
+.mt20{
+    margin-top: 20px;
 }
 </style>

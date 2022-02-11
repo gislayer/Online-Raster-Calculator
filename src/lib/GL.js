@@ -1,5 +1,5 @@
 //import GeoTIFF, { fromUrl, fromUrls, fromArrayBuffer, fromBlob } from 'geotiff';
-import {fromArrayBuffer} from 'geotiff';
+import {fromArrayBuffer, fromUrl} from 'geotiff';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -9,9 +9,11 @@ import ImageLayer from 'ol/layer/Image';
 import proj4 from 'proj4';
 import {register} from 'ol/proj/proj4';
 import {FullScreen, defaults as defaultControls, Zoom, ScaleLine} from 'ol/control';
-import {transformExtent} from 'ol/proj';
-import {plot,addColorScale} from 'plotty';
-addColorScale("mycolorscale", ["#FF0000", "#00FF00", "#0000FF"], [0, 0.5, 1]);
+import {transformExtent,transform} from 'ol/proj';
+import {plot,addColorScale,colorscales} from 'plotty';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+addColorScale("ndvicolor", ["#FF0000", "#00FF00"], [0, 0.46]);
 
 var GL = {
     rasters:{},
@@ -22,7 +24,12 @@ var GL = {
         fullscreen:false,
         scale:false
     },
-    mesaj:'başlangıç'
+    lastAnalysis:{
+      layerid:'',
+      analysisId:'',
+      analysType:''
+    },
+    mesaj:''
     
 };
 
@@ -199,6 +206,23 @@ GL.RSanalysis = {
     },
 };
 
+GL.loadGeoTIFFFromURL=function(bandType,url,callback){
+  var fileName = url.split('/').pop();
+  var ext = fileName.split('.').pop();
+  fromUrl(url).then((tiff)=>{
+    GL.readTiff(tiff,(res)=>{
+      callback({
+        id:'file-'+Date.now(),
+        name:fileName,
+        ext:ext,
+        data:res,
+        bandType:bandType,
+        added:false
+      });
+    });
+  });
+}
+
 
 GL.loadGeoTIFFFromComputer = function(bandType,callback){
     var fileElement = document.createElement('input');
@@ -206,7 +230,6 @@ GL.loadGeoTIFFFromComputer = function(bandType,callback){
     fileElement.accept = '.tiff,.tif,.geotiff';
     fileElement.click();
     fileElement.addEventListener('change',function(e){
-      console.log("geldi");
       var file = e.target.files[0];
       var reader  = new FileReader();
       var ext = file.name.split('.').pop();
@@ -258,29 +281,34 @@ GL.EPSG = {
   },
 };
 
+GL.readTiff = function(tiff,callback){
+  tiff.getImage().then(function(image) {
+    var bits = image.fileDirectory.BitsPerSample;
+    var epsgcode = image.geoKeys.ProjectedCSTypeGeoKey;
+    var width = image.getWidth();
+    var height = image.getHeight();
+    var bbox = image.getBoundingBox();
+    GL.EPSG.search(epsgcode);
+    image.readRasters().then(function(bands){
+      var result = {
+        bands:bands,
+        width:width,
+        height:height,
+        bbox:bbox,
+        epsg:epsgcode,
+        bits:bits
+      }
+      callback(result);
+    });
+  });
+}
+
 GL.readGeoTIFF = function(data,callback){
   console.log("fromArrayBuffer");
   fromArrayBuffer(data).then(function(tiff) {
-    tiff.getImage().then(function(image) {
-      var bits = image.fileDirectory.BitsPerSample;
-      var epsgcode = image.geoKeys.ProjectedCSTypeGeoKey;
-      var width = image.getWidth();
-      var height = image.getHeight();
-      var bbox = image.getBoundingBox();
-      GL.EPSG.search(epsgcode);
-      image.readRasters().then(function(bands){
-        var result = {
-          bands:bands,
-          width:width,
-          height:height,
-          bbox:bbox,
-          epsg:epsgcode,
-          bits:bits
-        }
-        callback(result);
-      });
+    GL.readTiff(tiff,(res)=>{
+      callback(res);
     });
-    
   });
 }
 
@@ -324,6 +352,13 @@ GL.createRasterImage=function(obj){
   return base64img;
 }
 
+GL.removeLayer = function(file){
+  var layer = GL.rasters[file.id];
+  if(layer!==undefined){
+    GL.map.removeLayer(layer);
+  }
+}
+
 GL.addRasterLayer = function(file){
   console.log("addRasterLayer");
   var layerControl = this.rasters[file.id];
@@ -353,12 +388,25 @@ GL.addRasterLayer = function(file){
     })
   });
 
+  this.rasters[file.id].on('click',(e)=>{
+    console.log(e);
+    /*var xy = evt.pixel;
+    var canvasContext = $('.ol-unselectable')[0].getContext('2d');   
+    var pixelAtClick = canvasContext.getImageData(xy[0], xy[1], 1, 1).data;
+    var red = pixeAtClick[0];*/
+  });
+
   this.map.addLayer(this.rasters[file.id]);
   GL.map.getView().fit(transformExtent(file.data.bbox, 'EPSG:'+file.data.epsg, 'EPSG:3857'), GL.map.getSize());
 }
 
 GL.changeBandLayer = function(file,bandName,plottyName){
   console.log("changeBandLayer");
+  this.lastAnalysis={
+    layerid:file.id,
+    analysisId:bandName,
+    analysType:'band'
+  };
   var layer = GL.rasters[file.id];
   if(layer===undefined){
     return false;
@@ -388,6 +436,7 @@ GL.changeBandLayer = function(file,bandName,plottyName){
       min=file.data.bands[bandnum][k];
     }
   }
+  
   var myplot = new plot({
     canvas: canvasA,
     data: file.data.bands[bandnum], 
@@ -399,16 +448,23 @@ GL.changeBandLayer = function(file,bandName,plottyName){
   });
   myplot.render();
   
+  
   var newsource = new Static({
     url: canvasA.toDataURL("image/png"),
     imageExtent: file.data.bbox,
     projection: 'EPSG:'+file.data.epsg
   });
   layer.setSource(newsource);
+  GL.drawLegend(plottyName,min,max);
 }
 
 GL.doAnalysis1 = function(analys,file,plottyName){
   console.log("doAnalysis1");
+  this.lastAnalysis={
+    layerid:file.id,
+    analysisId:analys.id,
+    analysType:'calc'
+  };
   var sat = GL.satellites[file.bandType];
   var band1 = sat[analys.vars[0]].id;
   var band2 = sat[analys.vars[1]].id;
@@ -424,12 +480,13 @@ GL.doAnalysis1 = function(analys,file,plottyName){
   var max = -9999999999;
   var arr = [];
   for(var i=0;i<bands[band1].length;i++){
-    var d = (bands[band1][i]-bands[band2][i])/(bands[band1][i]+bands[band2][i])*100;
+    var d = (bands[band1][i]-bands[band2][i])/(bands[band1][i]+bands[band2][i]);
     //d=(d+1)/2;
     if(d>max){max=d;}
     if(d<min){min=d;}
     arr.push(d);
   }
+  
   var myplot = new plot({
     canvas: canvasA,
     data: arr, 
@@ -448,6 +505,7 @@ GL.doAnalysis1 = function(analys,file,plottyName){
   });
   layer.setSource(newsource);
   GL.changeOpacity(file,1);
+  GL.drawLegend(plottyName,min,max);
 }
 
 GL.showRGBRaster = function(file){
@@ -480,6 +538,133 @@ GL.changeOpacity = function(file,opacity){
   if(layer!==undefined){
     layer.setOpacity(parseFloat(opacity));
   }
+}
+
+GL.drawLegend = function(plottyName,min,max){
+  var legendDiv= document.getElementById('legend');
+  var width = legendDiv.offsetWidth;
+  var height = 20;
+  var canvas = document.getElementById('legendCanvas');
+  var ctx = canvas.getContext('webgl');
+  canvas.width = width;
+  canvas.height = height;
+  var tot = (max-min)/width;
+  var j = 0;
+  var arr = [];
+  var last = width*height;
+  for(var i=0;i<last;i++){
+    if(j==width){
+      j=0;
+    }
+    arr.push(min+(j*tot));
+    j++;
+  }
+  var myplotlegend = new plot({
+    canvas: ctx.canvas,
+    data: arr, 
+    width: width, 
+    height: height,
+    clampLow: true,
+    clampHigh: true,
+    domain: [min,max], colorScale: plottyName
+  });
+  document.getElementById('raster_min').innerHTML=min.toFixed(2);
+  document.getElementById('raster_max').innerHTML=max.toFixed(2);
+  myplotlegend.render();
+  console.log(colorscales);
+}
+
+GL.dataURItoBlob = function(dataURI) {
+  // convert base64 to raw binary data held in a string
+  // doesn't handle URLEncoded DataURIs - see SO answer #6850276 for code that does this
+  var byteString = atob(dataURI.split(',')[1]);
+
+  // separate out the mime component
+  var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0]
+
+  // write the bytes of the string to an ArrayBuffer
+  var ab = new ArrayBuffer(byteString.length);
+
+  // create a view into the buffer
+  var ia = new Uint8Array(ab);
+
+  // set the bytes of the buffer to the correct values
+  for (var i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+  }
+
+  // write the ArrayBuffer to a blob, and you're done
+  var blob = new Blob([ab], {type: mimeString});
+  return blob;
+
+}
+
+GL.calcWorldFile = function (coord1, coord2, size) {
+  var lat1 = coord1[1];
+  var lon1 = coord1[0];
+  var lat2 = coord2[1];
+  var lon2 = coord2[0];
+  if (lat1 < 0) {
+    lat1 = 0 - lat1;
+  }
+  if (lon1 < 0) {
+    lon1 = 0 - lon1;
+  }
+  if (lat2 < 0) {
+    lat2 = 0 - lat2;
+  }
+  if (lon2 < 0) {
+    lon2 = 0 - lon2;
+  }
+  var xsize = size[0];
+  var ysize = size[1];
+  var t;
+  if (lon1 < lon2) {
+    t = +lon1;
+    lon1 = lon2;
+    lon2 = t;
+  }
+  var ppx = (lon1 - lon2) / xsize;
+  if (lat1 > lat2) {
+    t = +lat1;
+    lat1 = lat2;
+    lat2 = t;
+  }
+  var ppy = (lat1 - lat2) / ysize;
+  lon2 += ppx / 2; // x center of pixel
+  lat2 += ppy / 2; // y center of pixel
+  var wf = ppx.toString() + "\n" + "0.00000\n0.00000\n" + ppy.toString() + "\n" + lon2.toString() + "\n" + lat2.toString();
+  return wf;
+};
+
+GL.downloadRaster = function(file){
+  console.log("downloadRaster");
+  var layer = GL.rasters[file.id];
+  if(layer===undefined){
+    alert("There is no layer to download");
+    return false;
+  }
+  var zip = new JSZip();
+  var name = file.name;
+  var prj = 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]]';
+  var base64Image = layer.getSource().getUrl();
+  var bbox = file.data.bbox;
+  var epsg = file.data.epsg;
+  var blob = GL.dataURItoBlob(base64Image);
+  zip.folder('GISLayer Online Raster Calculator').file('print.png', blob);
+  zip.folder('GISLayer Online Raster Calculator').file('print.prj', prj);
+  var cord1 = [bbox[0], bbox[1]];
+  var cord2 = [bbox[2], bbox[3]];
+  var cord1_4326 = transform(cord1, 'EPSG:'+epsg, 'EPSG:4326');
+  var cord2_4326 = transform(cord2, 'EPSG:'+epsg, 'EPSG:4326');
+  var size = [file.data.width, file.data.height];
+  var worldFile = GL.calcWorldFile(cord1_4326, cord2_4326, size);
+  zip.folder('GISLayer Online Raster Calculator').file('print.pgw', worldFile);
+  zip.generateAsync({
+    type: "blob"
+  }).then(function (blob) {
+    saveAs(blob, name+"-online-raster-calculator.zip");
+  });
 }
 
 export default GL;

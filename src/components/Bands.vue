@@ -13,6 +13,11 @@
       </select>
     </div>
     <div></div>
+    <div class="ui grid legend" >
+      <div class="left one wide column p0" style="padding:0; padding-left:10px; text-align: center; font-size: 10px;" id="raster_min"></div>
+      <div id="legend" class="fourteen wide column p0" style="padding:0;"><canvas id="legendCanvas"></canvas></div>
+      <div class="right one wide column p0" style="padding:0; padding-right:10px; text-align: center; font-size: 10px;" id="raster_max"></div>
+    </div>
   </div>
 </template>
 
@@ -29,28 +34,28 @@ export default {
       clickedBand:'',
       plotty:{
         selected:'rainbow',
-        data:['viridis','inferno','turbo','rainbow','jet','hsv','hot','cool','spring','summer','autumn','winter','bone','copper','greys','ylgnbu','greens','ylorrd','bluered','rdbu','picnic','portland','blackbody','earth','electric','magma','plasma']
+        data:['ndvicolor','viridis','inferno','turbo','rainbow','jet','hsv','hot','cool','spring','summer','autumn','winter','bone','copper','greys','ylgnbu','greens','ylorrd','bluered','rdbu','picnic','portland','blackbody','earth','electric','magma','plasma']
       },
       bandType:{
           selected:'',
           data:[
               {
-                  id:'sentinel2',name:'Source Type : Sentinel 2 MSI'
+                  id:'sentinel2',name:'Sat. Imgage : Sentinel 2 MSI'
               },
               {
-                  id:'landsat5',name:'Source Type : Landsat 5 TM'
+                  id:'landsat5',name:'Sat. Imgage : Landsat 5 TM'
               },
               {
-                  id:'landsat8',name:'Source Type : Landsat 8 OLI'
+                  id:'landsat8',name:'Sat. Imgage : Landsat 8 OLI'
               },
               {
-                  id:'ibgr',name:'Source Type : IBGR'
+                  id:'ibgr',name:'Sat. Imgage : IBGR'
               },
               {
-                  id:'rgbi',name:'Source Type : RGBI'
+                  id:'rgbi',name:'Sat. Imgage : RGBI'
               },
               {
-                  id:'custom',name:'Source Type : Custom'
+                  id:'custom',name:'Sat. Imgage : Custom'
               }
           ]
       },
@@ -87,10 +92,16 @@ export default {
     },
     changePlotty(){
       console.log("changePlotty");
-      if(this.clickedBand==''){
-        this.clickedBand="B01";
+      if(GL.lastAnalysis.analysType=='band'){
+        if(this.clickedBand==''){
+                this.clickedBand="B01";
+        }
+        this.openBand({name:this.clickedBand});
       }
-      this.openBand({name:this.clickedBand});
+      if(GL.lastAnalysis.analysType=='calc'){
+        var item = GL.RSanalysis[GL.lastAnalysis.analysisId];
+        this.$root.$refs.leftside.doAnalys(item);
+      }
     }
   },
 }
@@ -160,6 +171,18 @@ export default {
     top: -2px;
     right: 0;
     background-color: #2f3133;
+}
+.legend{
+    top: 88px;
+    height: 20px;
+    background-color: #ccc;
+    position: fixed;
+    width: calc(100% - 210px);
+    left: 224px;
+    background-color: #000;
+}
+.p0{
+  padding: 0 !important;
 }
 </style>
 

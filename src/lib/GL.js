@@ -263,14 +263,14 @@ GL.EPSG = {
   file: 'EPSG:4326',
   result: {},
   search: function search(text) {
-    var url = 'https://epsg.io/?format=json&q=' + text;
+    var url = 'https://crm.gislayer.com/notercode/api/code/epsg-code/' + text;
     fetch(url).then(function (response) {
       return response.json();
     }).then(function (result) {
-      if (result.number_result > 0) {
-        var res = result.results[0];
-        var code = res['code'];
-        var proj4def = res['proj4'];
+      if (result.data && result.data.length > 0) {
+        var res = result.data[0];
+        var code = res.code;
+        var proj4def = res.proj4;
         var newProjCode = 'EPSG:' + code;
         proj4.defs(newProjCode, proj4def);
         register(proj4);
